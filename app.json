@@ -1,0 +1,43 @@
+{
+  "name": "UltraFastBanBot",
+  "description": "A bulletproof Telegram bot that bans all non-admin users in a group at blazing speed (10 bans/sec) with flood control.",
+  "repository": "https://github.com/your/repo",
+  "logo": "https://te.legra.ph/file/38d4bfcddaa4d2f4d4c32.jpg",
+  "keywords": [
+    "telegram",
+    "pyrogram",
+    "mass-ban",
+    "admin-tool",
+    "heroku"
+  ],
+  "env": {
+    "API_ID": {
+      "description": "Get your API ID from https://my.telegram.org",
+      "required": true
+    },
+    "API_HASH": {
+      "description": "Get your API HASH from https://my.telegram.org",
+      "required": true
+    },
+    "BOT_TOKEN": {
+      "description": "Get bot token from @BotFather",
+      "required": true
+    }
+  },
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    }
+  ],
+  "formation": {
+    "worker": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  },
+  "stack": "heroku-22",
+  "addons": [],
+  "scripts": {
+    "postdeploy": "echo ✅ UltraFastBanBot is deployed successfully!"
+  }
+}
