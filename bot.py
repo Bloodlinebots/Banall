@@ -2,7 +2,7 @@ import os
 import asyncio
 from pyrogram import Client, filters
 from pyrogram.types import Message
-from pyrogram.errors import FloodWait, RPCError
+from pyrogram.errors import FloodWait
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 
@@ -11,8 +11,8 @@ API_HASH = os.environ.get("API_HASH")
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 
 app = Client("ultrafast_ban_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
-
 user_clients = {}  # Store user_id -> TelethonClient
+
 
 @app.on_message(filters.command("start") & filters.private)
 async def start_handler(client, message: Message):
@@ -62,7 +62,7 @@ async def has_ban_rights_telethon(client, group_id):
 async def check_admin_power(client, message: Message):
     if len(message.command) < 2:
         return await message.reply("⚠️ Usage: `/check <group_id>`")
-    
+
     group_id = int(message.command[1])
     user_id = message.from_user.id
 
@@ -135,5 +135,6 @@ async def ban_all_users(client, message: Message):
         )
     except Exception as e:
         await message.reply(f"❌ Unexpected error: <code>{e}</code>", parse_mode="html")
+
 
 app.run()
