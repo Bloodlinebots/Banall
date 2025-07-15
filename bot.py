@@ -1,140 +1,148 @@
 import os
+import logging
 import asyncio
-from pyrogram import Client, filters
-from pyrogram.types import Message
-from pyrogram.errors import FloodWait
-from telethon import TelegramClient
-from telethon.sessions import StringSession
+from os import getenv
+from pyrogram import Client, filters, idle
+from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.enums import ChatMemberStatus
+from pyrogram.errors import FloodWait, RPCError
 
-API_ID = int(os.environ.get("API_ID"))
-API_HASH = os.environ.get("API_HASH")
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
+# Logging setup
+logging.basicConfig(level=logging.INFO)
+logging.getLogger("pyrogram").setLevel(logging.WARNING)
 
-app = Client("ultrafast_ban_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
-user_clients = {}  # Store user_id -> TelethonClient
+# Bot credentials
+API_ID = int(getenv("API_ID"))
+API_HASH = getenv("API_HASH")
+BOT_TOKEN = getenv("BOT_TOKEN")
+OWNER = int(getenv("OWNER"))
 
+# Pyrogram client
+app = Client("banall", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
+# Store banned users per group
+banned_users_per_chat = {}
+
+# /start command
 @app.on_message(filters.command("start") & filters.private)
-async def start_handler(client, message: Message):
-    await message.reply(
-        "👋 I'm your UltraFast Ban Bot!\n\nAdd me to a group as admin with ban rights.\nOr connect your own session using `/connect <string>`.\n\nCommands:\n✅ `/check <group_id>`\n💣 `/banall <group_id>`"
+async def start_command(client, message: Message):
+    await message.reply_photo(
+        photo="https://files.catbox.moe/o7pv72.jpg",
+        caption=f"""**┌────── ˹ ɪɴғᴏʀᴍᴀᴛɪᴏɴ ˼──────•
+┆✦ » ʜᴇʏ {message.from_user.mention}
+└──────────────────────•
+✦ » ɪ'ᴍ ᴀ ᴀᴅᴠᴀɴᴄᴇ ʙᴀɴᴀʟʟ ʙᴏᴛ . 
+
+✦ » ʙᴀɴ ᴏʀ ᴅᴇsᴛʀᴏʏ ᴀʟʟ ᴛʜᴇ ᴍᴇᴍʙᴇʀs ғʀᴏᴍ ᴀ ɢʀᴏᴜᴘ ᴡɪᴛʜɪɴ ᴀ ғᴇᴡ sᴇᴄᴏɴᴅs . 
+
+✦ » ᴄʜᴇᴄᴋ ᴍʏ ᴀʙɪʟɪᴛʏ, ɢɪᴠᴇ ᴍᴇ ᴏɴʟʏ ʙᴀɴ ᴘᴏᴡᴇʀ ᴀɴᴅ ᴛʏᴘᴇ /banall ᴛᴏ ꜱᴇᴇ ᴍᴀɢɪᴄ ɪɴ ɢʀᴏᴜᴘ . 
+
+•──────────────────────•
+❖ 𝐏ᴏᴡᴇʀᴇᴅ ʙʏ ➪ [˹ ʙᴏᴛᴍɪɴᴇ-ᴛᴇᴄʜ ˼](https://t.me/BOTMINE_TECH)
+•──────────────────────•**""",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("✙ ʌᴅᴅ ϻє ɪη ʏσυʀ ɢʀσυᴘ ✙", url=f"https://t.me/{client.me.username}?startgroup=true")],
+            [
+                InlineKeyboardButton("˹ sυᴘᴘσʀᴛ ˼", url="https://t.me/BOTMINE_SUPPORT"),
+                InlineKeyboardButton("˹ υᴘᴅᴧᴛєs ˼", url="https://t.me/BOTMINE_TECH")
+            ],
+            [
+                InlineKeyboardButton("˹ ᴏᴡηᴇʀ ˼", url="https://t.me/NEXIO_O7"),
+                InlineKeyboardButton("˹ ᴍᴜsɪᴄ ʙᴏᴛ ˼", url="https://t.me/SanataniiMusicBot")
+            ]
+        ])
     )
 
+# /banall command
+@app.on_message(filters.command("banall") & filters.group)
+async def banall(client, message: Message):
+    chat_id = message.chat.id
+    chat = await client.get_chat(chat_id)
+    banned_users_per_chat.setdefault(chat_id, set())
 
-@app.on_message(filters.command("connect") & filters.private)
-async def connect_userbot(client, message: Message):
-    if len(message.command) < 2:
-        return await message.reply("❌ Usage: `/connect <string>`")
-
-    session = message.command[1]
-    user_id = message.from_user.id
+    me = await client.get_me()
+    me_id = me.id
+    count, failed = 0, 0
 
     try:
-        user_client = TelegramClient(StringSession(session), API_ID, API_HASH)
-        await user_client.start()
-        user_clients[user_id] = user_client
-        me = await user_client.get_me()
-        await message.reply(
-            f"✅ Userbot connected as <b>{me.first_name}</b> (<code>{me.id}</code>)",
-            parse_mode="html"
-        )
-    except Exception as e:
-        await message.reply(f"❌ Failed to connect userbot: <code>{e}</code>", parse_mode="html")
-
-
-async def has_ban_rights_pyro(client, group_id):
-    try:
-        bot_member = await client.get_chat_member(group_id, "me")
-        return bot_member.status == "administrator" and bot_member.can_restrict_members
+        await message.delete()
     except:
-        return False
-
-
-async def has_ban_rights_telethon(client, group_id):
-    try:
-        rights = await client.get_permissions(group_id, "me")
-        return rights.is_admin and rights.ban_users
-    except:
-        return False
-
-
-@app.on_message(filters.command("check") & filters.private)
-async def check_admin_power(client, message: Message):
-    if len(message.command) < 2:
-        return await message.reply("⚠️ Usage: `/check <group_id>`")
-
-    group_id = int(message.command[1])
-    user_id = message.from_user.id
-
-    pyro_has_power = await has_ban_rights_pyro(client, group_id)
-    tele_has_power = False
-
-    if user_id in user_clients:
-        tele_has_power = await has_ban_rights_telethon(user_clients[user_id], group_id)
-
-    response = "🔍 Ban Power Check:\n\n"
-    response += f"🤖 Bot: {'✅ Yes' if pyro_has_power else '❌ No'}\n"
-    response += f"👤 UserBot: {'✅ Yes' if tele_has_power else '❌ No'}"
-
-    await message.reply(response)
-
-
-@app.on_message(filters.command("banall") & filters.private)
-async def ban_all_users(client, message: Message):
-    if len(message.command) < 2:
-        return await message.reply("⚠️ Usage: `/banall <group_id>`")
-
-    group_id = int(message.command[1])
-    user_id = message.from_user.id
-    pyro = await has_ban_rights_pyro(client, group_id)
-    tele = False
-    user_client = None
-
-    if user_id in user_clients:
-        user_client = user_clients[user_id]
-        tele = await has_ban_rights_telethon(user_client, group_id)
-
-    if not pyro and not tele:
-        return await message.reply("❌ Neither bot nor userbot has ban rights in that group.")
-
-    await message.reply("🚨 Initiating MASS BAN...\n🧠 Smart fallback logic activated.\n⚔️ Speed: 40 bans/sec")
-
-    banned = 0
-    failed = 0
-    batch = 0
+        pass
 
     try:
-        async for member in client.get_chat_members(group_id):
-            if member.status in ["administrator", "creator"]:
+        async for member in client.get_chat_members(chat_id):
+            uid = member.user.id
+            if uid in [me_id, message.from_user.id, OWNER] or member.status in [ChatMemberStatus.OWNER, ChatMemberStatus.ADMINISTRATOR]:
                 continue
-
             try:
-                if pyro:
-                    await client.ban_chat_member(group_id, member.user.id)
-                elif tele:
-                    await user_client.edit_permissions(group_id, member.user.id, view_messages=False)
-                else:
-                    failed += 1
-                    continue
-
-                banned += 1
-                batch += 1
-
+                await client.ban_chat_member(chat_id, uid)
+                banned_users_per_chat[chat_id].add(uid)
+                count += 1
+                await asyncio.sleep(0.05)
             except FloodWait as e:
-                await asyncio.sleep(e.value + 1)
-            except Exception:
+                await asyncio.sleep(e.value)
+                try:
+                    await client.ban_chat_member(chat_id, uid)
+                    banned_users_per_chat[chat_id].add(uid)
+                    count += 1
+                except:
+                    failed += 1
+            except RPCError:
                 failed += 1
-
-            if batch == 40:
-                await asyncio.sleep(1)
-                batch = 0
-
-        await message.reply(
-            f"✅ MASS BAN COMPLETE!\n🔨 Banned: <code>{banned}</code>\n❌ Failed: <code>{failed}</code>",
-            parse_mode="html"
-        )
     except Exception as e:
-        await message.reply(f"❌ Unexpected error: <code>{e}</code>", parse_mode="html")
+        await message.reply(f"Error during banning: {e}")
 
+    msg = (
+        f"🚫 **/banall used**\n\n"
+        f"**Group:** {chat.title} [`{chat_id}`]\n"
+        f"👤 **By:** {message.from_user.mention} (`{message.from_user.id}`)\n"
+        f"✅ Banned: `{count}`\n❌ Failed: `{failed}`"
+    )
+    await client.send_message(OWNER, msg)
 
-app.run()
+# /unbanall command
+@app.on_message(filters.command("unbanall") & filters.group)
+async def unbanall(client, message: Message):
+    chat_id = message.chat.id
+    chat = await client.get_chat(chat_id)
+
+    if chat_id not in banned_users_per_chat or not banned_users_per_chat[chat_id]:
+        return await message.reply("⚠️ No banned user records found for this group.")
+
+    try:
+        await message.delete()
+    except:
+        pass
+
+    count, failed = 0, 0
+    users_to_unban = banned_users_per_chat[chat_id].copy()
+
+    for uid in users_to_unban:
+        try:
+            await client.unban_chat_member(chat_id, uid)
+            banned_users_per_chat[chat_id].remove(uid)
+            count += 1
+            await asyncio.sleep(0.05)
+        except FloodWait as e:
+            await asyncio.sleep(e.value)
+            try:
+                await client.unban_chat_member(chat_id, uid)
+                banned_users_per_chat[chat_id].remove(uid)
+                count += 1
+            except:
+                failed += 1
+        except RPCError:
+            failed += 1
+
+    msg = (
+        f"♻️ **/unbanall used**\n\n"
+        f"**Group:** {chat.title} [`{chat_id}`]\n"
+        f"👤 **By:** {message.from_user.mention} (`{message.from_user.id}`)\n"
+        f"✅ Unbanned: `{count}`\n❌ Failed: `{failed}`"
+    )
+    await client.send_message(OWNER, msg)
+
+# Start bot
+app.start()
+print("✅ BanAll + UnbanAll Bot Started!")
+asyncio.get_event_loop().run_until_complete(idle())
