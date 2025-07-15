@@ -34,9 +34,12 @@ async def connect_userbot(client, message: Message):
         await user_client.start()
         user_clients[user_id] = user_client
         me = await user_client.get_me()
-        await message.reply(f"✅ Userbot connected as {me.first_name} (`{me.id}`)")
+        await message.reply(
+            f"✅ Userbot connected as <b>{me.first_name}</b> (<code>{me.id}</code>)",
+            parse_mode="html"
+        )
     except Exception as e:
-        await message.reply(f"❌ Failed to connect userbot: `{e}`")
+        await message.reply(f"❌ Failed to connect userbot: <code>{e}</code>", parse_mode="html")
 
 
 async def has_ban_rights_pyro(client, group_id):
@@ -126,9 +129,11 @@ async def ban_all_users(client, message: Message):
                 await asyncio.sleep(1)
                 batch = 0
 
-        await message.reply(f"✅ MASS BAN COMPLETE!\n🔨 Banned: `{banned}`\n❌ Failed: `{failed}`")
+        await message.reply(
+            f"✅ MASS BAN COMPLETE!\n🔨 Banned: <code>{banned}</code>\n❌ Failed: <code>{failed}</code>",
+            parse_mode="html"
+        )
     except Exception as e:
-        await message.reply(f"❌ Unexpected error: `{e}`")
-
+        await message.reply(f"❌ Unexpected error: <code>{e}</code>", parse_mode="html")
 
 app.run()
